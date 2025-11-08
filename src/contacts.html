@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>我的通讯录</title>
+    <style>
+        /* 这里的 CSS 代码是让页面好看一点 */
+        body { font-family: Arial, sans-serif; margin: 20px; max-width: 800px; margin: auto; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { border: 1px solid #ddd; padding: 12px; text-align: left; }
+        th { background-color: #f2f2f2; }
+        form { margin-top: 30px; padding: 20px; border: 1px solid #ccc; border-radius: 8px; }
+        input { margin-bottom: 10px; padding: 8px; width: 95%; }
+        button { padding: 10px 15px; background-color: #007bff; color: white; border: none; cursor: pointer; }
+        button:hover { background-color: #0056b3; }
+        .delete-btn { background-color:#dc3545; }
+        .delete-btn:hover { background-color: #c82333;}
+    </style>
+</head>
+<body>
+
+    <h1>My Contact frontend </h1>
+
+    <h2>add new contact</h2>
+    <form id="add-form">
+        <label for="name">name:</label>
+        <input type="text" id="add-name" required>
+        <br>
+        <label for="phone">phone number:</label>
+        <input type="text" id="add-phone" required>
+        <br>
+        <button type="submit">added people</button>
+    </form>
+
+    <h2>contacter list</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>name</th>
+                <th>phone-number</th>
+                <th>operations</th>
+            </tr>
+        </thead>
+        <tbody id="contacts-list-body">
+            </tbody>
+    </table>
+
+    <script>
+        
+        // （这个地址必须和你的后端服务器一致！）
+        const API_BASE_URL = 'http://8.130.72.23:8000/api';
+
+        // 2. “读取全部”功能 (GET) 
+        async function fetchContacts() {
+            try {
+                // (1) JS "访问" 服务器
+                const response = await fetch(`${API_BASE_URL}/people`);
+                
+                // (2) 把服务器返回的JSON数据格式拆开
+                const contacts = await response.json();
+
+                // (3) 找到 HTML里的表格身体
+                const listBody = document.getElementById('contacts-list-body');
+                listBody.innerHTML = ''; // 先清空旧数据
+
+                // (4) 循环每一条联系人数据
+                contacts.forEach(contact => {
+                    // (5) 为每个人创建一行 (tr)
+                    const row = document.createElement('tr');
+                    
+                    // (6) 把数据填入 HTML
+                    row.innerHTML = `
+                        <td>${contact.id}</td>
+                        <td>${contact.name}</td>
+                        <td>${contact.phone}</td>
+                        <td>
+                            <button class_name = "update-bin" onclick = "startUpdate(${contact.id})">修改</button>
+                            <button class="delete-btn" onclick="deleteContact(${contact.id})">删除</button>
+
+                            </td>
+                    `;
+                    
+                    // (7) 把这一行"挂"到表格上
+                    listBody.appendChild(row);
+                });
+            } catch (error) {
+                console.error('读取联系人失败 (是不是后端没开?):', error);
+                alert('读取联系人失败！请检查后端服务器是否已启动。');
+            }
+        }
+
+        // 3. “添加”功能 (POST) 
+        // (1) 找到 HTML 里的 "添加表单"
+        document.getElementById('add-form').addEventListener('submit', async function(event) {
+            event.preventDefault(); // (2) 阻止表单"刷新页面" 
+
+            // (3) 拿到输入框里的值
+            const name = document.getElementById('add-name').value;
+            const phone = document.getElementById('add-phone').value;
+
+            try {
+                // (4) 用 "POST" 方法把新数据给服务器
+                await fetch(`${API_BASE_URL}/people`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ name: name, phone: phone }),
+                });
+
+                // (5) 添加成功后，清空输入框
+                document.getElementById('add-name').value = '';
+                document.getElementById('add-phone').value = '';
+                
+                // (6) 刷新列表并重新执行"读取全部"功能
+                fetchContacts(); 
+            } catch (error) {
+                console.error('添加联系人失败:', error);
+            }
+        });
+
+        // 4. “删除”功能 (DELETE) 
+        async function deleteContact(id) {
+            // (1) 弹窗确认
+            if (!confirm(`你确定要删除 ID 为 ${id} 的联系人吗？`)) {
+                return; // 用户点了"取消"
+            }
+            
+            try {
+                // (2) 告诉 "大脑" 要删除谁
+                await fetch(`${API_BASE_URL}/people/${id}`, {
+                    method: 'DELETE',
+                });
+                
+                // (3) 刷新列表
+                fetchContacts(); 
+            } catch (error) {
+                console.error('删除联系人失败:', error);
+            }
+        }
+
+        async function startUpdate(id) {
+            try {
+                
+                // 必须从后端数据库读取，不能用缓存。
+                //我先用 GET /api/people/{id} 查一次。
+                const response = await fetch(`${API_BASE_URL}/people/${id}`);
+                if (!response.ok) {
+                    throw new Error('读取联系人旧数据失败');
+                }
+
+                const contact = await response.json(); 
+                // (contact 变量现在是 {id: 2, name: "李四", ...})
+
+                // 用 prompt() 弹窗，让用户输入“新”数据
+                    
+                const newName = prompt("请输入新姓名:", contact.name);
+                // (如果用户点了“取消”，newName 会是 null)
+                if (newName === null) {
+                    return; // 用户取消，函数结束
+                }
+
+                const newPhone = prompt("请输入新电话:", contact.phone);
+                if (newPhone === null) {
+                    return; // 用户取消，函数结束
+                }
+
+                // (3) 把“新”数据用 PUT 方法发给“大脑”
+                await fetch(`${API_BASE_URL}/people/${id}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    //(注意! 我们把新数据打包成 JSON)
+                    body: JSON.stringify({ name: newName, phone: newPhone }),
+                });
+
+                // (4) 成功！刷新整个列表，显示新数据！
+                fetchContacts();
+
+            } catch (error) {
+                console.error('修改联系人失败:', error);
+                alert('修改失败！');
+            }
+        }
+
+        // 5. 启动！
+        // 当你(用浏览器)刚打开这个页面时, 立即执行一次"读取全部"功能
+        fetchContacts();
+    </script>
+
+</body>
+</html>
