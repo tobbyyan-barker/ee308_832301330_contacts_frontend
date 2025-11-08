@@ -1,33 +1,51 @@
-# deploy.yml
+# deploy.yml (最终稳定版)
 name: Deploy Frontend to Pages
 
 on:
   push:
     branches:
-      - master
+      - master  # 监听 master 分支的推送
 
+# 确保 Actions 有足够的权限来写 Pages 和读取内容
 permissions:
-  contents: read
+  contents: read  
   pages: write
   id-token: write
 
 jobs:
-  deploy:
+  build-and-deploy:
+    environment:
+      name: github-pages  # 使用内置的 Pages 环境
+      url: ${{ steps.deployment.outputs.page_url }}
+
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+      
+      # 1. 设置 Node.js 环境 (Pages 依赖 Node.js)
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
 
+      # 2. 设置 Pages
       - name: Setup Pages
         uses: actions/configure-pages@v5
-        with:
-          static_site_generator: custom
 
+      # 3. 复制和打包你的文件
+      - name: Build Site (Copy files from src to _site)
+        run: |
+          mkdir _site
+          cp -R src/* _site/
+          
+      # 4. 上传打包文件
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: 'src' # <--- 明确指定只发布 src 文件夹
-
+          path: '_site' # 上传我们刚刚创建的 _site 目录
+          
+      # 5. 部署到 GitHub Pages
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
